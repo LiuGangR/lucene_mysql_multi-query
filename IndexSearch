@@ -1,0 +1,117 @@
+package com;
+
+import java.io.File;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.NumericRangeQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.IOContext;
+import org.apache.lucene.store.RAMDirectory;
+import org.apache.lucene.util.Version;
+
+
+public class IndexSearch {
+ 
+
+    
+    
+     public static void search(int count,Analyzer analyzer, String indexDir) {
+
+     Directory directory = null;
+        long begin = System.currentTimeMillis();
+        try {
+            //directory = FSDirectory.open(new File(indexDir));
+          directory = FSDirectory.open(new File(indexDir));
+        //you can read index directly in this way
+        //DirectoryReader indexReader = DirectoryReader.open(directory);
+        //or read it in RAM through this way
+        RAMDirectory ramDir = new RAMDirectory(directory, IOContext.READ);
+        DirectoryReader indexReader = DirectoryReader.open(ramDir);
+        IndexSearcher indexSearcher = new IndexSearcher(indexReader);
+        QueryParser queryParser = new QueryParser(Version.LUCENE_42, "appShortDesc", analyzer);
+        QueryParser nameQueryParser = new QueryParser(Version.LUCENE_42, "creatorName", analyzer);
+
+       
+        
+        
+//        //多条件查询,feil应该一样
+//        MultiPhraseQuery multiQ = new MultiPhraseQuery();
+//        multiQ.add(new Term(field, "游戏"));
+//        multiQ.add(new Term("creatorName", "游戏"));
+//        TermQuery tq = new TermQuery(new Term(""));
+//        Weight w =  query.createWeight(indexSearcher);
+//        FuzzyQuery fuzzQ = new FuzzyQuery(new Term("appShortDesc","key"));
+        
+        TopDocs topDoc = null;
+        
+        	long timeB = System.currentTimeMillis();
+        	
+        	//int limit
+        	Query q = NumericRangeQuery.newIntRange("appId", 30000000, 40000000, true, true);
+
+            DateFormat ymdFormat = new SimpleDateFormat("yyyy-MM-dd");
+            long time1 = ymdFormat.parse("2012-01-15").getTime();
+            long time2 = ymdFormat.parse("2013-01-15").getTime();
+            
+            //time limit
+            Query timeQuery = NumericRangeQuery.newLongRange("timestamp", time1, time2, true, true);
+            
+            //query key
+            Query query = queryParser.parse("游戏");
+        	Query nameQuery = nameQueryParser.parse("游戏");
+        	//set one query key a higher weight
+            query.setBoost(2);
+            
+            //this is meaning QUERY and NAMEQUERY at least contain a key (“游戏”)
+            BooleanQuery bq=new BooleanQuery();
+            BooleanQuery innerbq=new BooleanQuery();
+            innerbq.add(nameQuery, BooleanClause.Occur.SHOULD);
+            innerbq.add(query, BooleanClause.Occur.SHOULD);
+            bq.add(innerbq, BooleanClause.Occur.MUST);
+            
+            //add other condition
+            bq.add(q, BooleanClause.Occur.MUST);
+            bq.add(timeQuery, BooleanClause.Occur.MUST);
+            
+            //set the sort
+            Sort sort = new Sort(new SortField("appType", SortField.Type.INT, true),
+					 new SortField("appId", SortField.Type.INT, true),
+					 new SortField("timestamp", SortField.Type.LONG, true));
+            
+        	topDoc = indexSearcher.search(bq, count, sort);
+        	System.out.println("|" + (System.currentTimeMillis() - timeB) + "|" + topDoc.scoreDocs.length);
+
+        	
+        ScoreDoc[] scoreDocs = topDoc.scoreDocs;
+        for (int i = 0; i < scoreDocs.length; i++) {
+            Document doc = indexSearcher.doc(scoreDocs[i].doc);
+            System.out.println(doc.get("appType") + "|" + doc.get("appId") + "|" + doc.get("creatorName") + "|" + doc.get("appShortDesc"));
+            System.out.println("------------------------------------------------");
+        }
+
+        System.out.println("Search time is " + String.valueOf(System.currentTimeMillis() - begin));
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ParseException e) {
+            e.printStackTrace();
+        } catch (java.text.ParseException e) {
+            e.printStackTrace();
+        }
+    }
+}
