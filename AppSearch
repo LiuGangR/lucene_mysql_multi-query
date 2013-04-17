@@ -1,0 +1,41 @@
+package com;
+
+import org.apache.lucene.analysis.Analyzer;
+import org.wltea.analyzer.lucene.IKAnalyzer;
+
+public class AppSearch {
+
+
+    //private final static Logger log = Logger.getLogger(AppSearch.class);
+    
+    // index dir , in linux/unix 保存路径
+    private static String INDEX_DIR = "/data/liugang/test/lucene-test/index";
+
+    //实例化IKAnalyzer分词器
+
+    private static Analyzer analyzer = new IKAnalyzer();
+
+
+    public static void main(String[] args) {
+
+        Long timeB = System.currentTimeMillis();
+        String isSearch = args[0];
+        int count = Integer.valueOf(args[1]);
+        if (isSearch != null && isSearch.endsWith("true")) {
+          //create index
+            IndexCreate.create(analyzer, INDEX_DIR);
+        }
+        else 
+        	//search from the index
+            IndexSearch.search( count, analyzer, INDEX_DIR);
+
+        System.out.println("totalMemory:" + Runtime.getRuntime().totalMemory() / 1024L / 1024L + "M");
+
+        System.out.print("totalTime:" + (System.currentTimeMillis() - timeB));
+        System.out.print("totalMemory:");
+        System.out.println(Runtime.getRuntime().totalMemory() / 1024L / 1024L + "M");
+
+        System.exit(0);
+    }
+ 
+}
